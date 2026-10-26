@@ -247,6 +247,14 @@ void Wal::append(WalOperation operation, const std::string& key, const std::stri
 
     try {
 #ifdef _WIN32
+        // CreateFileW starts a synchronous handle's file pointer at byte zero. Because
+        // this handle also has GENERIC_WRITE (needed by FlushFileBuffers), FILE_APPEND_DATA
+        // alone does not guarantee that WriteFile ignores that pointer. Reposition before
+        // each record so writes after a restart cannot overwrite the beginning of the WAL.
+        LARGE_INTEGER append_offset{};
+        if (!SetFilePointerEx(reinterpret_cast<HANDLE>(handle_), append_offset, nullptr, FILE_END)) {
+            throw io_error("unable to seek to WAL end", path_);
+        }
         std::size_t written = 0;
         while (written < record.size()) {
             const auto remaining = record.size() - written;
