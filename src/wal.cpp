@@ -117,10 +117,16 @@ Wal::~Wal() {
 
 void Wal::replay(const std::function<void(WalOperation, std::string, std::string)>& apply) {
     std::ifstream input(path_, std::ios::binary);
-    if (!input) {
-        if (!std::filesystem::exists(path_)) {
-            return;
+    if (!input && !std::filesystem::exists(path_)) {
+        std::ofstream create(path_, std::ios::binary | std::ios::app);
+        if (!create) {
+            throw std::runtime_error("unable to create WAL '" + path_.string() + "'");
         }
+        create.close();
+        input.clear();
+        input.open(path_, std::ios::binary);
+    }
+    if (!input) {
         throw std::runtime_error("unable to read WAL '" + path_.string() + "'");
     }
 

@@ -2,6 +2,7 @@
 #include "tinykv/protocol.hpp"
 
 #include <atomic>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -77,6 +78,7 @@ void wal_recovery_and_torn_tail() {
     std::filesystem::remove(path);
     {
         tinykv::Database database(path, false);
+        CHECK(std::filesystem::exists(path));
         database.set("kept", "value");
         database.set("removed", "old");
         CHECK(database.erase("removed"));
@@ -161,12 +163,17 @@ void protocol_pipeline_and_errors() {
 } // namespace
 
 int main() {
-    database_basics();
-    database_concurrency();
-    wal_recovery_and_torn_tail();
-    wal_corruption_is_rejected();
-    protocol_incremental_and_binary();
-    protocol_pipeline_and_errors();
+    try {
+        database_basics();
+        database_concurrency();
+        wal_recovery_and_torn_tail();
+        wal_corruption_is_rejected();
+        protocol_incremental_and_binary();
+        protocol_pipeline_and_errors();
+    } catch (const std::exception& exception) {
+        std::cerr << "uncaught exception in test suite: " << exception.what() << '\n';
+        return 1;
+    }
     if (failures != 0) {
         std::cerr << failures << " assertion(s) failed\n";
         return 1;
